@@ -1,4 +1,3 @@
-// here we store todos locally in an object array
 var express = require('express');
 var bodyParser = require('body-parser');
 var _ = require('underscore');
@@ -69,7 +68,7 @@ app.delete('/todos/:id', function(req, res) {
 		}
 	}).then(function(rowsDeleted) {
 		if (rowsDeleted == 1) {
-             res.status(204).send();
+			res.status(204).send();
 		} else {
 			res.status(404).json({
 				error: 'no todo found'
@@ -109,6 +108,27 @@ app.put('/todos/:id', function(req, res) {
 	_.extend(matchedTodo, validattributes);
 	res.json(matchedTodo);
 });
+
+app.post('/users', function(req, res) {
+	var body = _.pick(req.body, 'email', 'password');
+	db.user.create(body).then(function(user) {
+		res.json(user.toPublicJSON());
+	}, function(e) {
+		res.status(400).json({
+			error:'Email already exist'
+		});
+	});
+});
+
+app.post('/users/login', function(req, res) {
+	var body = _.pick(req.body, 'email', 'password');
+	db.user.authenticate(body).then(function(user) {
+		res.json(user.toPublicJSON());
+	}, function(e) {
+		res.status(401).send();
+	});
+});
+
 db.sequelize.sync().then(function() {
 	app.listen(PORT, function() {
 		console.log('server started');
