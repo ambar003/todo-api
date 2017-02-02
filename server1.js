@@ -99,32 +99,25 @@ app.delete('/todos/:id', middleware.requireAuthentication, function(req, res) {
 //PUT /todos/:id update todo item
 app.put('/todos/:id', middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
-	var matchedTodo = _.findWhere(todos, {
-		id: todoId
-	});
 	var body = _.pick(req.body, 'description', 'completed');
-	var validattributes = {};
-
-	if (!matchedTodo) {
-		return res.status(404).send();
-	}
-
-	if (body.hasOwnProperty('completed') && _.isBoolean('completed')) {
-		validattributes.completed = body.completed;
-	} else if (body.hasOwnProperty('completed')) {
-		res.status(400).send();
-	}
-
-	if (body.hasOwnProperty('description') && (_.isString(body.description) || body.description.trim().length != 0)) {
-		validattributes.description = body.description;
-	} else if (body.hasOwnProperty('description')) {
-		res.status(400).send();
-	}
-
-	// using extend method of underscore copy objects
-
-	_.extend(matchedTodo, validattributes);
-	res.json(matchedTodo);
+	var attributes = {};
+	if (body.hasOwnProperty('completed'))
+		attributes.completed = body.completed;
+	if (body.hasOwnProperty('description'))
+		attributes.description = body.description;
+	db.todo.findById(todoId).then(function(todo) {
+		if (todo) {
+			todo.update(attributes).then(function(todo) {
+				res.json(todo.toJSON());
+			}, function(e) {
+				res.status(400).send(e);
+			});
+		} else {
+			res.status(404).send();
+		}
+	}, function() {
+		res.status(500).send();
+	});
 });
 
 //POST /users add user information to the database
@@ -168,7 +161,7 @@ app.delete('/users/logout', middleware.requireAuthentication, function(req, res)
 });
 
 db.sequelize.sync({
-	force: true
+//	force: true
 }).then(function() {
 	app.listen(PORT, function() {
 		console.log('server started');
