@@ -4,17 +4,19 @@ var _ = require('underscore');
 var db = require('./db.js');
 var app = express();
 var PORT = process.env.PORT || 3000;
-
 var todos = [];
 var todoNextId = 1;
-
 app.use(bodyParser.json());
 
+
+var middleware = require('./middleware.js')(db);
+// root of api 
 app.get('/', function(req, res) {
 	res.send('Todo API root');
 });
 
-app.get('/todos', function(req, res) {
+// GET /todos gives all todos in database
+app.get('/todos',middleware.requireAuthentication, function(req, res) {
 	var query = req.query;
 	var where = {};
 	if (query.hasOwnProperty('completed')) {
@@ -38,7 +40,8 @@ app.get('/todos', function(req, res) {
 	});
 });
 
-app.get('/todos/:id', function(req, res) {
+//GET /todos/:id gives todo with given id
+app.get('/todos/:id',middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
 	db.todo.findById(todoId).then(function(todo) {
 		if (todo) {
@@ -51,7 +54,8 @@ app.get('/todos/:id', function(req, res) {
 	});
 });
 
-app.post('/todos', function(req, res) {
+//POST /todos addint todo to database
+app.post('/todos',middleware.requireAuthentication, function(req, res) {
 	var body = _.pick(req.body, 'description', 'completed');
 	db.todo.create(body).then(function(todo) {
 		res.json(todo.toJSON());
@@ -60,7 +64,8 @@ app.post('/todos', function(req, res) {
 	});
 });
 
-app.delete('/todos/:id', function(req, res) {
+//DELETE /todos/:id delete todo of given id 
+app.delete('/todos/:id',middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
 	db.todo.destroy({
 		where: {
@@ -79,7 +84,8 @@ app.delete('/todos/:id', function(req, res) {
 	});
 });
 
-app.put('/todos/:id', function(req, res) {
+//PUT /todos/:id update todo item
+app.put('/todos/:id',middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
 	var matchedTodo = _.findWhere(todos, {
 		id: todoId
@@ -109,27 +115,35 @@ app.put('/todos/:id', function(req, res) {
 	res.json(matchedTodo);
 });
 
+//POST /users add user information to the database
 app.post('/users', function(req, res) {
 	var body = _.pick(req.body, 'email', 'password');
 	db.user.create(body).then(function(user) {
 		res.json(user.toPublicJSON());
 	}, function(e) {
 		res.status(400).json({
-			error:'Email already exist'
+			error: 'Email already exist'
 		});
 	});
-});
+}); 
 
+//POST send and authenticate user login details
 app.post('/users/login', function(req, res) {
 	var body = _.pick(req.body, 'email', 'password');
 	db.user.authenticate(body).then(function(user) {
-		res.json(user.toPublicJSON());
+		var token = user.generateToken('authentication');
+		if (token)
+			res.header('Auth', token).json(user.toPublicJSON());
+		else
+			res.status(401).send();
 	}, function(e) {
 		res.status(401).send();
 	});
 });
 
-db.sequelize.sync().then(function() {
+db.sequelize.sync({
+	force: true
+}).then(function() {
 	app.listen(PORT, function() {
 		console.log('server started');
 	});
